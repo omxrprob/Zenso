@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zenso - Upload</title>
+    <link rel="stylesheet" href="css/style.css">
+    <script src="https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/12.6.0/firebase-storage.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js"></script>
+</head>
+<body>
+    <div class="container">
+        <nav>
+            <a href="home.html">Feed</a> 
+            <a href="profile.html">Profile</a> 
+            <a href="#" onclick="firebase.auth().signOut()">Logout</a>
+        </nav>
+        <h2>Upload a Video</h2>
+        <input type="file" id="video-file-input" accept="video/*">
+        <textarea id="caption-input" placeholder="Add a caption..."></textarea>
+        
+        <div id="upload-progress-bar">
+            <div id="upload-progress-fill"></div>
+        </div>
+        <p id="upload-status">Select a video and a caption, then click Upload.</p>
+        
+        <button id="upload-btn" class="btn">Upload</button>
+    </div>
+    
+    <script src="js/firebase-init.js"></script>
+    <script src="js/upload.js"></script>
+</body>
+</html>
