@@ -3,19 +3,527 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Zenso - Login</title>
-    <link rel="stylesheet" href="css/style.css">
+    <title>Zenso - The Efficient Social Media</title>
     <script src="https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/12.6.0/firebase-storage.js"></script>
+
+    <style>
+        /* --- CSS STYLING (Embedded) --- */
+        :root {
+            --zenso-dark: #121212;
+            --zenso-light: #F0F0F0;
+            --zenso-accent: #00BFFF; /* Deep Sky Blue */
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+            background-color: var(--zenso-dark);
+            color: var(--zenso-light);
+            height: 100vh;
+            overflow: hidden; 
+            display: flex;
+            flex-direction: column;
+        }
+
+        .view-container {
+            flex-grow: 1;
+            overflow-y: hidden;
+            display: none;
+        }
+        .view-container.active {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .content {
+            padding: 20px;
+            max-width: 400px;
+            margin: 0 auto;
+            width: 100%;
+            box-sizing: border-box;
+            flex-grow: 1;
+            overflow-y: auto; /* Allow scrolling within the content area */
+        }
+
+        .center-content {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            text-align: center;
+        }
+
+        /* --- Navigation & Buttons --- */
+        nav {
+            display: flex;
+            justify-content: space-around;
+            padding: 10px 0;
+            background-color: var(--zenso-dark);
+            border-bottom: 1px solid #333;
+            z-index: 10;
+            flex-shrink: 0;
+        }
+        nav a {
+            color: var(--zenso-light);
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        .btn {
+            background-color: var(--zenso-accent);
+            color: var(--zenso-dark);
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: bold;
+            margin-top: 15px;
+            transition: background-color 0.2s;
+        }
+        .btn:hover {
+            background-color: #0099CC;
+        }
+
+        /* --- Forms (Profile/Upload) --- */
+        input[type="text"], textarea, input[type="file"] {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #333;
+            background-color: #222;
+            color: var(--zenso-light);
+            border-radius: 5px;
+            box-sizing: border-box;
+        }
+        textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        /* --- Feed Specific (TikTok-like Scroll) --- */
+        #feed-view {
+            height: 100vh;
+            overflow-y: scroll; /* Primary scroll area */
+            scroll-snap-type: y mandatory; /* Ensures full-video snapping */
+            box-sizing: border-box;
+            background-color: #000;
+        }
+        #feed-view .nav {
+            position: fixed;
+            top: 0;
+            width: 100%;
+            max-width: inherit; /* Inherit max-width from the outer container if used */
+            background-color: rgba(18, 18, 18, 0.9);
+            z-index: 100;
+        }
+        .video-post {
+            width: 100%;
+            height: 100vh;
+            position: relative;
+            scroll-snap-align: start;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .video-player {
+            width: 100%;
+            height: 100%;
+            object-fit: cover; /* Fill the screen */
+        }
+
+        .post-details {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background: linear-gradient(transparent, rgba(0, 0, 0, 0.7));
+            padding: 60px 20px 20px;
+            box-sizing: border-box;
+        }
+
+        .post-caption, .post-author {
+            margin: 5px 0;
+            font-weight: bold;
+        }
+        .post-author {
+            color: var(--zenso-accent);
+        }
+        #upload-progress-bar {
+            width: 100%;
+            height: 8px;
+            background-color: #333;
+            border-radius: 4px;
+            margin-top: 10px;
+            overflow: hidden;
+        }
+        #upload-progress-fill {
+            height: 100%;
+            width: 0%;
+            background-color: var(--zenso-accent);
+            transition: width 0.3s;
+        }
+    </style>
 </head>
 <body>
-    <div class="container center-content">
+
+    <div id="login-view" class="view-container center-content active">
         <h1>Welcome to Zenso</h1>
         <p>Login or Sign up using your Google account to start sharing!</p>
         <button id="google-login-btn" class="btn">Sign In with Google</button>
     </div>
 
-    <script src="js/firebase-init.js"></script>
-    <script src="js/auth.js"></script>
+    <div id="feed-view" class="view-container">
+        <nav class="nav">
+            <a href="?view=feed">Feed</a> 
+            <a href="?view=upload">Upload</a> 
+            <a href="?view=profile">Profile</a> 
+            <a href="#" onclick="signOutUser()">Logout</a>
+        </nav>
+        <div id="video-feed-area" style="padding-top: 40px;">
+            <p style="text-align: center;">Loading Zenso Feed...</p>
+        </div>
+    </div>
+
+    <div id="upload-view" class="view-container">
+        <nav>
+            <a href="?view=feed">Feed</a> 
+            <a href="?view=upload">Upload</a> 
+            <a href="?view=profile">Profile</a> 
+            <a href="#" onclick="signOutUser()">Logout</a>
+        </nav>
+        <div class="content">
+            <h2>Upload a Video</h2>
+            <input type="file" id="video-file-input" accept="video/*">
+            <textarea id="caption-input" placeholder="Add a caption..."></textarea>
+            
+            <div id="upload-progress-bar">
+                <div id="upload-progress-fill"></div>
+            </div>
+            <p id="upload-status">Select a video and a caption, then click Upload.</p>
+            
+            <button id="upload-btn" class="btn">Upload</button>
+        </div>
+    </div>
+
+    <div id="profile-view" class="view-container">
+        <nav>
+            <a href="?view=feed">Feed</a> 
+            <a href="?view=upload">Upload</a> 
+            <a href="?view=profile">Profile</a> 
+            <a href="#" onclick="signOutUser()">Logout</a>
+        </nav>
+        <div class="content">
+            <h2>My Zenso Profile</h2>
+            <p>Current User: <span id="user-email-display"></span></p>
+
+            <label for="name-input">Display Name:</label>
+            <input type="text" id="name-input">
+            
+            <label for="bio-input">Bio:</label>
+            <textarea id="bio-input"></textarea>
+            
+            <button id="update-profile-btn" class="btn">Update Profile</button>
+            <p id="profile-status"></p>
+        </div>
+    </div>
+
+    <script>
+        // --- FIREBASE CONFIGURATION (js/firebase-init.js equivalent) ---
+        
+        // IMPORTANT: Replace the dummy values below with your actual project config.
+        const FIREBASE_API_KEY = "YOUR_FIREBASE_API_KEY_HERE"; 
+
+        const firebaseConfig = {
+            apiKey: FIREBASE_API_KEY, 
+            authDomain: "zenso-project-id.firebaseapp.com",
+            projectId: "zenso-project-id",
+            storageBucket: "zenso-project-id.appspot.com",
+            messagingSenderId: "1234567890",
+            appId: "1:1234567890:web:abcdef123456"
+        };
+
+        // Initialize Firebase services
+        const app = firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+        const storage = firebase.storage();
+
+        // --- NAVIGATION LOGIC ---
+        
+        // Function to switch between views (pages)
+        function navigateTo(viewId) {
+            document.querySelectorAll('.view-container').forEach(view => {
+                view.classList.remove('active');
+            });
+            document.getElementById(viewId).classList.add('active');
+            window.history.pushState(null, '', `?view=${viewId.replace('-view', '')}`);
+        }
+
+        // --- AUTHENTICATION (js/auth.js equivalent) ---
+
+        function signOutUser() {
+            auth.signOut().then(() => {
+                // Navigated by authStateChanged listener
+            });
+        }
+
+        function signInWithGoogle() {
+            const provider = new firebase.auth.GoogleAuthProvider();
+            auth.signInWithPopup(provider)
+                .then((result) => {
+                    const user = result.user;
+                    console.log("User signed in:", user.displayName);
+
+                    // Create/Update a basic profile in Firestore
+                    db.collection("users").doc(user.uid).get().then(doc => {
+                        if (!doc.exists) {
+                            db.collection("users").doc(user.uid).set({
+                                name: user.displayName,
+                                bio: "A new Zenso user!",
+                                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                            });
+                        }
+                    });
+                }).catch((error) => {
+                    console.error("Google Sign-in Error:", error.message);
+                    alert(`Login failed: ${error.message}`);
+                });
+        }
+        
+        // Main Auth State Listener
+        auth.onAuthStateChanged((user) => {
+            const urlParams = new URLSearchParams(window.location.search);
+            let requestedView = urlParams.get('view') || 'feed'; // Default to feed
+            
+            if (user) {
+                // User is logged in
+                if (window.location.search.includes('view=')) {
+                    navigateTo(`${requestedView}-view`);
+                } else {
+                    navigateTo('feed-view'); // Default login redirect
+                }
+                
+                // Initialize specific views on login/navigation
+                if (requestedView === 'feed') { loadFeed(); }
+                if (requestedView === 'profile') { loadUserProfile(user.uid); }
+                
+            } else {
+                // User is NOT logged in
+                if (requestedView === 'login') {
+                    navigateTo('login-view');
+                } else {
+                    navigateTo('login-view'); // Force login view
+                }
+            }
+        });
+        
+        // --- UPLOAD LOGIC (js/upload.js equivalent) ---
+
+        document.addEventListener('DOMContentLoaded', () => {
+             document.getElementById('google-login-btn').addEventListener('click', signInWithGoogle);
+             document.getElementById('upload-btn').addEventListener('click', handleUpload);
+             document.getElementById('update-profile-btn').addEventListener('click', () => updateProfile(auth.currentUser.uid));
+        });
+
+        function handleUpload() {
+            const file = document.getElementById('video-file-input').files[0];
+            const caption = document.getElementById('caption-input').value;
+            const statusEl = document.getElementById('upload-status');
+            const progressBar = document.getElementById('upload-progress-fill');
+            const user = auth.currentUser;
+
+            if (!user || !file || caption.trim() === "") {
+                statusEl.textContent = "Please select a file, enter a caption, and be logged in.";
+                return;
+            }
+
+            // Reset UI
+            statusEl.textContent = "Starting upload...";
+            progressBar.style.width = '0%';
+            document.getElementById('upload-btn').disabled = true;
+
+            const storageRef = storage.ref();
+            const fileName = `${user.uid}/${Date.now()}_original_${file.name}`;
+            const videoRef = storageRef.child(fileName);
+
+            const uploadTask = videoRef.put(file);
+
+            uploadTask.on(firebase.storage.TaskEvent.STATE_CHANGED, 
+                (snapshot) => {
+                    const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                    progressBar.style.width = `${progress}%`;
+                    statusEl.textContent = `Upload is ${progress.toFixed(0)}% complete. (File size: ${(file.size / 1024 / 1024).toFixed(2)} MB)`;
+                }, 
+                (error) => {
+                    console.error("Upload failed:", error);
+                    statusEl.textContent = `Upload failed: ${error.message}`;
+                    document.getElementById('upload-btn').disabled = false;
+                }, 
+                () => {
+                    statusEl.textContent = "Upload successful. Compression is now REQUIRED.";
+                    
+                    // --- ⚠️ COMPRESSION MANDATORY (Placeholder) ---
+                    console.warn("MANDATORY COMPRESSION REQUIRED: A serverless function (like GCF) must be triggered to compress and delete this large file.");
+                    
+                    // Save initial post record to Firestore
+                    db.collection("posts").add({
+                        userId: user.uid,
+                        caption: caption,
+                        originalFilePath: fileName, 
+                        status: "pending_compression", 
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    }).then(() => {
+                        statusEl.textContent = "Video submitted! It is currently being processed for compression and will appear on the feed soon.";
+                        document.getElementById('upload-btn').disabled = false;
+                        document.getElementById('video-file-input').value = '';
+                        document.getElementById('caption-input').value = '';
+                        // Navigate back to the feed after a delay
+                        setTimeout(() => navigateTo('feed-view'), 3000); 
+                    }).catch(e => {
+                        console.error("Firestore error:", e);
+                        statusEl.textContent = "Error saving post data.";
+                        document.getElementById('upload-btn').disabled = false;
+                    });
+                }
+            );
+        }
+
+        // --- PROFILE LOGIC (js/profile.js equivalent) ---
+
+        function loadUserProfile(userId) {
+            document.getElementById('user-email-display').textContent = auth.currentUser.email;
+
+            db.collection("users").doc(userId).get()
+                .then(doc => {
+                    if (doc.exists) {
+                        const data = doc.data();
+                        document.getElementById('name-input').value = data.name || '';
+                        document.getElementById('bio-input').value = data.bio || '';
+                    }
+                }).catch(error => {
+                    console.error("Error loading user profile:", error);
+                });
+        }
+
+        function updateProfile(userId) {
+            const newName = document.getElementById('name-input').value.trim();
+            const newBio = document.getElementById('bio-input').value.trim();
+            const statusEl = document.getElementById('profile-status');
+
+            if (!newName) {
+                statusEl.textContent = "Name cannot be empty.";
+                return;
+            }
+
+            db.collection("users").doc(userId).update({
+                name: newName,
+                bio: newBio,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            })
+            .then(() => {
+                statusEl.textContent = "Profile successfully updated!";
+                auth.currentUser.updateProfile({
+                    displayName: newName
+                });
+            })
+            .catch(error => {
+                console.error("Error updating profile:", error);
+                statusEl.textContent = `Error updating profile: ${error.message}`;
+            });
+        }
+        
+        // --- FEED LOGIC (js/feed.js equivalent) ---
+
+        function loadFeed() {
+            const feedArea = document.getElementById('video-feed-area');
+            
+            // Keep the navbar, clear the rest
+            const navBarHtml = feedArea.querySelector('nav') ? feedArea.querySelector('nav').outerHTML : '';
+            feedArea.innerHTML = navBarHtml + '<p style="text-align: center; padding-top: 40px;">Loading Zenso Feed...</p>'; 
+
+            db.collection("posts")
+                .orderBy("createdAt", "desc")
+                .limit(10) 
+                .get()
+                .then(snapshot => {
+                    // Clear the loading message
+                    feedArea.innerHTML = navBarHtml; 
+                    
+                    if (snapshot.empty) {
+                        feedArea.innerHTML += '<p style="text-align: center; padding-top: 40px;">No videos yet! Be the first to upload one.</p>';
+                        return;
+                    }
+
+                    snapshot.forEach(doc => {
+                        const post = doc.data();
+                        const originalFilePath = post.originalFilePath; 
+                        
+                        if (originalFilePath) {
+                            storage.ref(originalFilePath).getDownloadURL().then(videoUrl => {
+                                // Only append if the view is still 'feed-view'
+                                if (document.getElementById('feed-view').classList.contains('active')) {
+                                    const postElement = createVideoPostElement(post, videoUrl);
+                                    feedArea.appendChild(postElement);
+                                }
+                            });
+                        }
+                    });
+                })
+                .catch(error => {
+                    console.error("Error loading feed:", error);
+                    feedArea.innerHTML = navBarHtml + '<p style="text-align: center; color: red;">Error loading feed.</p>';
+                });
+        }
+
+        function createVideoPostElement(post, videoUrl) {
+            const postDiv = document.createElement('div');
+            postDiv.className = 'video-post';
+
+            let authorName = 'Loading...';
+            
+            // Fetch author name concurrently
+            db.collection("users").doc(post.userId).get().then(userDoc => {
+                if (userDoc.exists) {
+                    authorName = userDoc.data().name;
+                    const authorEl = postDiv.querySelector('.post-author');
+                    if(authorEl) authorEl.textContent = `By: ${authorName}`;
+                }
+            });
+
+            postDiv.innerHTML = `
+                <video class="video-player" src="${videoUrl}" controls loop muted></video>
+                <div class="post-details">
+                    <p class="post-caption">${post.caption}</p>
+                    <p class="post-author">By: ${authorName}</p>
+                    <small>Status: ${post.status}. (Compression required for optimal size!)</small>
+                </div>
+            `;
+            
+            // IntersectionObserver for auto-play effect
+            const videoElement = postDiv.querySelector('.video-player');
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        videoElement.play().catch(e => console.log("Autoplay blocked:", e));
+                    } else {
+                        videoElement.pause();
+                        videoElement.currentTime = 0; // Rewind when out of view
+                    }
+                });
+            }, { threshold: 0.8 }); // 80% of video must be visible
+
+            observer.observe(postDiv);
+
+            return postDiv;
+        }
+
+    </script>
 </body>
 </html>
