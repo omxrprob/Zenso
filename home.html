@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zenso - Feed</title>
+    <link rel="stylesheet" href="css/style.css">
+    <script src="https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/12.6.0/firebase-storage.js"></script>
+</head>
+<body>
+    <div class="feed-container" id="video-feed-area">
+        <nav>
+            <a href="upload.html">Upload</a> 
+            <a href="profile.html">Profile</a> 
+            <a href="#" onclick="firebase.auth().signOut()">Logout</a>
+        </nav>
+        <h2>Loading Zenso Feed...</h2>
+        </div>
+    
+    <script src="js/firebase-init.js"></script>
+    <script src="js/feed.js"></script>
+</body>
+</html>
